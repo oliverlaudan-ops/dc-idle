@@ -22,6 +22,7 @@ export interface GameContext {
   rng: Rng;
   scene: Tutorial;
   statusLine: HTMLElement | null;
+  phaseHint: HTMLElement | null;
   resetBtn: HTMLElement | null;
   colors: typeof COLORS;
 }
@@ -47,6 +48,7 @@ async function bootstrap() {
   const rng = seedRandom(0xc0ffee);
 
   const statusLine = document.getElementById("status-line");
+  const phaseHint = document.getElementById("phase-hint");
   const resetBtn = document.getElementById("reset-btn");
 
   const ctx: GameContext = {
@@ -54,6 +56,7 @@ async function bootstrap() {
     root,
     rng,
     statusLine,
+    phaseHint,
     resetBtn,
     colors: COLORS,
     scene: undefined as unknown as Tutorial,
@@ -66,6 +69,8 @@ async function bootstrap() {
     attempts: 0,
     maxAttempts: 6,
     status: "intro",
+    lastRegionCount: 0,
+    lastAvgPerRegion: 0,
   };
 
   ctx.scene = new Tutorial(ctx, tutorial);

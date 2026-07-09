@@ -8,6 +8,8 @@ export interface TutorialState {
   attempts: number;
   maxAttempts: number;
   status: "intro" | "playing" | "win" | "fail";
+  lastRegionCount: number;
+  lastAvgPerRegion: number;
 }
 
 const FIELD_TOP = 48;
@@ -142,16 +144,19 @@ export class Tutorial {
   }
 
   private updateBanner() {
-    // The visible banner now lives in the bottombar's #status-line.
-    if (this.ctx.statusLine) {
-      const left = this.state.maxAttempts - this.state.attempts;
-      const label =
-        this.state.status === "playing"
-          ? `TUTORIAL \u00b7 ${this.state.attempts}/${this.state.maxAttempts} \u00b7 ${left} split${left === 1 ? "" : "s"} left`
-          : this.state.status === "win"
-          ? "// FIELD BISECTED \u00b7 tap reset to retry"
-          : "// OUT OF SPLITS \u00b7 tap reset to retry";
-      this.ctx.statusLine.textContent = label;
+    if (!this.ctx.statusLine || !this.ctx.phaseHint) return;
+    const left = this.state.maxAttempts - this.state.attempts;
+    if (this.state.status === "playing") {
+      this.ctx.statusLine.textContent = `TUTORIAL \u00b7 ${this.state.attempts}/${this.state.maxAttempts} \u00b7 ${left} split${left === 1 ? "" : "s"} left`;
+      this.ctx.phaseHint.innerHTML = `click on the field to drop a vertical split. goal: \u2264 <span class="accent">${this.state.threshold}</span> points per region.`;
+    } else if (this.state.status === "win") {
+      const regions = this.state.lastRegionCount;
+      const avg = this.state.lastAvgPerRegion.toFixed(1);
+      this.ctx.statusLine.textContent = `// TUTORIAL PASSED \u00b7 ${this.state.attempts} split${this.state.attempts === 1 ? "" : "s"} \u00b7 ${regions} region${regions === 1 ? "" : "s"} \u00b7 avg ${avg} pts`;
+      this.ctx.phaseHint.innerHTML = `every region has \u2264 ${this.state.threshold} points \u2014 trivial to brute-force. <span class="accent">next:</span> boss #1 reveals the actual closest pair and the strip-merge phase. reset for another round.`;
+    } else {
+      this.ctx.statusLine.textContent = `// OUT OF SPLITS \u00b7 ${this.state.maxAttempts}/${this.state.maxAttempts} used`;
+      this.ctx.phaseHint.innerHTML = `a balanced split beats a deep one \u2014 try fewer, wider regions. <span class="accent">tip:</span> aim for roughly equal left/right counts each time.`;
     }
   }
 
@@ -256,6 +261,11 @@ export class Tutorial {
     const rightCount = segments[segments.length - 1]?.count ?? 0;
     this.state.splits.push({ x: worldX, worldX, leftCount, rightCount });
     this.state.attempts++;
+    // Track region stats for the win/fail summary line.
+    this.state.lastRegionCount = segments.length;
+    this.state.lastAvgPerRegion = segments.length === 0
+      ? 0
+      : segments.reduce((acc, s) => acc + s.count, 0) / segments.length;
     this.drawSplits();
     this.drawPoints();
     this.updateBanner();

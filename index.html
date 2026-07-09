@@ -55,11 +55,11 @@
         bottom: 0;
         left: 0;
         right: 0;
-        min-height: 56px;
+        min-height: 64px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 16px;
+        padding: 10px 16px 12px;
         font-size: 12px;
         letter-spacing: 0.05em;
         color: var(--text-dim);
@@ -67,8 +67,19 @@
         z-index: 10;
         gap: 12px;
       }
-      #bottombar .status { flex: 1; min-width: 0; }
-      #bottombar .status .key { color: var(--cyan); }
+      #bottombar .text { flex: 1; min-width: 0; }
+      #bottombar .text .status {
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-variant-numeric: tabular-nums;
+      }
+      #bottombar .text .hint {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--text-dim);
+        line-height: 1.4;
+      }
+      #bottombar .text .hint .accent { color: var(--cyan); }
       #bottombar button {
         flex-shrink: 0;
         background: transparent;
@@ -99,7 +110,10 @@
     </div>
     <div id="app"></div>
     <div id="bottombar">
-      <div class="status" id="status-line">TUTORIAL · CLOSEST PAIR</div>
+      <div class="text">
+        <div class="status" id="status-line">TUTORIAL · CLOSEST PAIR</div>
+        <div class="hint" id="phase-hint">click on the field to drop a vertical split.</div>
+      </div>
       <button type="button" id="reset-btn" aria-label="Reset tutorial">↻ Reset</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
