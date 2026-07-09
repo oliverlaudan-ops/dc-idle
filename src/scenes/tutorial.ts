@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, FederatedPointerEvent } from "pixi.js";
+import { Container, Graphics, FederatedPointerEvent } from "pixi.js";
 import type { GameContext } from "../main";
 
 export interface TutorialState {
@@ -10,6 +10,9 @@ export interface TutorialState {
   status: "intro" | "playing" | "win" | "fail";
 }
 
+const FIELD_TOP = 48;
+const FIELD_H_PAD = 16;
+const FIELD_BOTTOM_PAD = 72; // leave space for bottombar (always-on, ~56px)
 const POINT_RADIUS = 5;
 const SPLIT_TOLERANCE_PX = 24;
 
@@ -19,11 +22,6 @@ export class Tutorial {
   private pointsLayer: Container;
   private splitsLayer: Container;
   private ghostLine: Graphics;
-  private banner: Text;
-  private subBanner: Text;
-  private resetButton: Graphics;
-  private resetLabel: Text;
-  private bannerLayer: Container;
   private width = 0;
   private height = 0;
   private state: TutorialState;
@@ -38,49 +36,10 @@ export class Tutorial {
     this.pointsLayer = new Container();
     this.splitsLayer = new Container();
     this.ghostLine = new Graphics();
-    this.bannerLayer = new Container();
-    this.banner = new Text({
-      text: "",
-      style: {
-        fill: ctx.colors.cyan,
-        fontFamily: "JetBrains Mono, monospace",
-        fontSize: 22,
-        fontWeight: "500",
-        letterSpacing: 1.5,
-      },
-    });
-    this.subBanner = new Text({
-      text: "",
-      style: {
-        fill: ctx.colors.textDim,
-        fontFamily: "JetBrains Mono, monospace",
-        fontSize: 12,
-        letterSpacing: 1,
-      },
-    });
-    this.bannerLayer.addChild(this.banner);
-    this.bannerLayer.addChild(this.subBanner);
-    this.resetButton = new Graphics();
-    this.resetLabel = new Text({
-      text: "↻  RESET",
-      style: {
-        fill: ctx.colors.bg,
-        fontFamily: "JetBrains Mono, monospace",
-        fontSize: 14,
-        fontWeight: "700",
-        letterSpacing: 1.5,
-      },
-    });
-    this.bannerLayer.addChild(this.resetButton);
-    this.bannerLayer.addChild(this.resetLabel);
-    this.resetButton.eventMode = "static";
-    this.resetButton.cursor = "pointer";
-    this.resetButton.on("pointertap", () => this.reseed());
     this.container.addChild(this.field);
     this.container.addChild(this.splitsLayer);
     this.container.addChild(this.pointsLayer);
     this.container.addChild(this.ghostLine);
-    this.container.addChild(this.bannerLayer);
     ctx.root.addChild(this.container);
   }
 
@@ -116,9 +75,8 @@ export class Tutorial {
   }
 
   private getFieldSize() {
-    // Reserve a 64px banner strip at top and 24px horizontal padding.
-    const w = window.innerWidth - 32;
-    const h = window.innerHeight - 96;
+    const w = window.innerWidth - 2 * FIELD_H_PAD;
+    const h = window.innerHeight - FIELD_TOP - FIELD_BOTTOM_PAD;
     return { width: w, height: h };
   }
 
@@ -126,16 +84,9 @@ export class Tutorial {
     const g = this.field;
     g.clear();
     const { width, height } = this.getFieldSize();
-    g.rect(16, 64, width, height)
+    g.rect(FIELD_H_PAD, FIELD_TOP, width, height)
       .stroke({ color: this.ctx.colors.border, width: 1 })
       .fill({ color: 0x0e1d24, alpha: 0.6 });
-    // Mark the "trivial" zone (≤ threshold points) as a faint inner band
-    // to make the win condition legible.
-    const left = 16;
-    const right = 16 + width;
-    g.moveTo(left, 64 + height - 28)
-      .lineTo(right, 64 + height - 28)
-      .stroke({ color: this.ctx.colors.border, width: 1, alpha: 0.6 });
   }
 
   private drawPoints() {
@@ -158,8 +109,8 @@ export class Tutorial {
           width: solved ? 0.6 : 1,
           alpha: solved ? 0.4 : 0.8,
         });
-      g.x = 16 + p.x;
-      g.y = 64 + p.y;
+      g.x = FIELD_H_PAD + p.x;
+      g.y = FIELD_TOP + p.y;
       layer.addChild(g);
     }
   }
@@ -169,12 +120,12 @@ export class Tutorial {
     layer.removeChildren();
     for (const s of this.state.splits) {
       const g = new Graphics();
-      const xScreen = 16 + s.worldX;
-      g.moveTo(xScreen, 64)
-        .lineTo(xScreen, 64 + this.height)
+      const xScreen = FIELD_H_PAD + s.worldX;
+      g.moveTo(xScreen, FIELD_TOP)
+        .lineTo(xScreen, FIELD_TOP + this.height)
         .stroke({ color: this.ctx.colors.cyan, width: 1, alpha: 0.85 });
       // tiny tick
-      g.rect(xScreen - 3, 64, 6, 6)
+      g.rect(xScreen - 3, FIELD_TOP, 6, 6)
         .fill({ color: this.ctx.colors.cyan });
       layer.addChild(g);
     }
@@ -184,52 +135,24 @@ export class Tutorial {
     const g = this.ghostLine;
     g.clear();
     if (worldX == null) return;
-    const xScreen = 16 + worldX;
-    g.moveTo(xScreen, 64)
-      .lineTo(xScreen, 64 + this.height)
+    const xScreen = FIELD_H_PAD + worldX;
+    g.moveTo(xScreen, FIELD_TOP)
+      .lineTo(xScreen, FIELD_TOP + this.height)
       .stroke({ color: this.ctx.colors.cyan, width: 1, alpha: 0.25 });
   }
 
   private updateBanner() {
-    if (this.state.status === "win") {
-      this.banner.text = "// FIELD BISECTED";
-      this.subBanner.text = "sub-problems \u2264 4 are trivial. boss #1: closest pair of points.";
-    } else if (this.state.status === "fail") {
-      this.banner.text = "// OUT OF SPLITS";
-      this.subBanner.text = "tip: a balanced split beats a deep one.";
-    } else {
-      this.banner.text = "TUTORIAL \u00b7 CLOSEST PAIR";
-      const remaining = Math.max(0, this.state.maxAttempts - this.state.attempts);
-      this.subBanner.text =
-        `click to drop a vertical split. \u2264 ${this.state.threshold} points = trivial. ${remaining} split${remaining === 1 ? "" : "s"} left. \u2192 reset.`;
-    }
-    this.banner.x = 16;
-    this.banner.y = 20;
-    this.subBanner.x = 16;
-    this.subBanner.y = 48;
-    if (this.ctx.hud) {
-      this.ctx.hud.textContent =
+    // The visible banner now lives in the bottombar's #status-line.
+    if (this.ctx.statusLine) {
+      const left = this.state.maxAttempts - this.state.attempts;
+      const label =
         this.state.status === "playing"
-          ? `TUTORIAL \u00b7 ${this.state.attempts}/${this.state.maxAttempts} \u00b7 R=RESET`
-          : this.state.status.toUpperCase();
+          ? `TUTORIAL \u00b7 ${this.state.attempts}/${this.state.maxAttempts} \u00b7 ${left} split${left === 1 ? "" : "s"} left`
+          : this.state.status === "win"
+          ? "// FIELD BISECTED \u00b7 tap reset to retry"
+          : "// OUT OF SPLITS \u00b7 tap reset to retry";
+      this.ctx.statusLine.textContent = label;
     }
-    const showReset = this.state.status !== "playing";
-    this.resetButton.visible = showReset;
-    this.resetLabel.visible = showReset;
-    if (showReset) this.drawResetButton();
-  }
-
-  private drawResetButton() {
-    const w = 110;
-    const h = 36;
-    const x = 16;
-    const y = 78;
-    this.resetButton.clear();
-    this.resetButton.roundRect(x, y, w, h, 4)
-      .fill({ color: this.ctx.colors.cyan })
-      .stroke({ color: this.ctx.colors.cyan, width: 1 });
-    this.resetLabel.x = x + 18;
-    this.resetLabel.y = y + 11;
   }
 
   private reseed() {
@@ -243,6 +166,9 @@ export class Tutorial {
   }
 
   private bindEvents() {
+    if (this.ctx.resetBtn) {
+      this.ctx.resetBtn.addEventListener("click", () => this.reseed());
+    }
     const onMove = (ev: PointerEvent) => {
       if (this.state.status !== "playing") {
         this.hoverX = null;
@@ -250,8 +176,8 @@ export class Tutorial {
         return;
       }
       const rect = (this.ctx.app.canvas as HTMLCanvasElement).getBoundingClientRect();
-      const x = ev.clientX - rect.left - 16;
-      const y = ev.clientY - rect.top - 64;
+      const x = ev.clientX - rect.left - FIELD_H_PAD;
+      const y = ev.clientY - rect.top - FIELD_TOP;
       if (x < 0 || x > this.width || y < 0 || y > this.height) {
         this.hoverX = null;
         this.drawGhost(null);
@@ -273,8 +199,8 @@ export class Tutorial {
     const onStageTap = (ev: FederatedPointerEvent) => {
       if (this.state.status !== "playing") return;
       const local = this.container.toLocal(ev.global);
-      const x = local.x - 16;
-      const y = local.y - 64;
+      const x = local.x - FIELD_H_PAD;
+      const y = local.y - FIELD_TOP;
       if (x < 0 || x > this.width || y < 0 || y > this.height) return;
       this.trySplit(x);
     };

@@ -21,7 +21,8 @@ export interface GameContext {
   root: Container;
   rng: Rng;
   scene: Tutorial;
-  hud: HTMLElement | null;
+  statusLine: HTMLElement | null;
+  resetBtn: HTMLElement | null;
   colors: typeof COLORS;
 }
 
@@ -45,13 +46,15 @@ async function bootstrap() {
   // Seed for first-frame determinism; reseeded on each tutorial run.
   const rng = seedRandom(0xc0ffee);
 
-  const hud = document.getElementById("hud-stat");
+  const statusLine = document.getElementById("status-line");
+  const resetBtn = document.getElementById("reset-btn");
 
   const ctx: GameContext = {
     app,
     root,
     rng,
-    hud,
+    statusLine,
+    resetBtn,
     colors: COLORS,
     scene: undefined as unknown as Tutorial,
   };
