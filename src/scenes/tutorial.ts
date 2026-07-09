@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics, Text, FederatedPointerEvent } from "pixi.js";
 import type { GameContext } from "../main";
 
 export interface TutorialState {
@@ -21,6 +21,8 @@ export class Tutorial {
   private ghostLine: Graphics;
   private banner: Text;
   private subBanner: Text;
+  private resetButton: Graphics;
+  private resetLabel: Text;
   private bannerLayer: Container;
   private width = 0;
   private height = 0;
@@ -58,6 +60,22 @@ export class Tutorial {
     });
     this.bannerLayer.addChild(this.banner);
     this.bannerLayer.addChild(this.subBanner);
+    this.resetButton = new Graphics();
+    this.resetLabel = new Text({
+      text: "↻  RESET",
+      style: {
+        fill: ctx.colors.bg,
+        fontFamily: "JetBrains Mono, monospace",
+        fontSize: 14,
+        fontWeight: "700",
+        letterSpacing: 1.5,
+      },
+    });
+    this.bannerLayer.addChild(this.resetButton);
+    this.bannerLayer.addChild(this.resetLabel);
+    this.resetButton.eventMode = "static";
+    this.resetButton.cursor = "pointer";
+    this.resetButton.on("pointertap", () => this.reseed());
     this.container.addChild(this.field);
     this.container.addChild(this.splitsLayer);
     this.container.addChild(this.pointsLayer);
@@ -178,12 +196,12 @@ export class Tutorial {
       this.subBanner.text = "sub-problems \u2264 4 are trivial. boss #1: closest pair of points.";
     } else if (this.state.status === "fail") {
       this.banner.text = "// OUT OF SPLITS";
-      this.subBanner.text = "tip: a balanced split beats a deep one. press R to retry.";
+      this.subBanner.text = "tip: a balanced split beats a deep one.";
     } else {
       this.banner.text = "TUTORIAL \u00b7 CLOSEST PAIR";
       const remaining = Math.max(0, this.state.maxAttempts - this.state.attempts);
       this.subBanner.text =
-        `click to drop a vertical split. split until a side has \u2264 ${this.state.threshold} points. ${remaining} split${remaining === 1 ? "" : "s"} left. press R to reseed.`;
+        `click to drop a vertical split. \u2264 ${this.state.threshold} points = trivial. ${remaining} split${remaining === 1 ? "" : "s"} left. \u2192 reset.`;
     }
     this.banner.x = 16;
     this.banner.y = 20;
@@ -192,9 +210,36 @@ export class Tutorial {
     if (this.ctx.hud) {
       this.ctx.hud.textContent =
         this.state.status === "playing"
-          ? `TUTORIAL \u00b7 ${this.state.attempts}/${this.state.maxAttempts}`
+          ? `TUTORIAL \u00b7 ${this.state.attempts}/${this.state.maxAttempts} \u00b7 R=RESET`
           : this.state.status.toUpperCase();
     }
+    const showReset = this.state.status !== "playing";
+    this.resetButton.visible = showReset;
+    this.resetLabel.visible = showReset;
+    if (showReset) this.drawResetButton();
+  }
+
+  private drawResetButton() {
+    const w = 110;
+    const h = 36;
+    const x = 16;
+    const y = 78;
+    this.resetButton.clear();
+    this.resetButton.roundRect(x, y, w, h, 4)
+      .fill({ color: this.ctx.colors.cyan })
+      .stroke({ color: this.ctx.colors.cyan, width: 1 });
+    this.resetLabel.x = x + 18;
+    this.resetLabel.y = y + 11;
+  }
+
+  private reseed() {
+    this.state.attempts = 0;
+    this.spawnPoints();
+    this.drawField();
+    this.drawPoints();
+    this.drawSplits();
+    this.drawGhost(null);
+    this.updateBanner();
   }
 
   private bindEvents() {
@@ -219,27 +264,25 @@ export class Tutorial {
       this.hoverX = null;
       this.drawGhost(null);
     };
-    const onClick = (ev: MouseEvent) => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "r" || ev.key === "R") {
+        this.reseed();
+      }
+    };
+    // Use Pixi's stage events for tap handling — handles both mouse and touch uniformly.
+    const onStageTap = (ev: FederatedPointerEvent) => {
       if (this.state.status !== "playing") return;
-      const rect = (this.ctx.app.canvas as HTMLCanvasElement).getBoundingClientRect();
-      const x = ev.clientX - rect.left - 16;
-      const y = ev.clientY - rect.top - 64;
+      const local = this.container.toLocal(ev.global);
+      const x = local.x - 16;
+      const y = local.y - 64;
       if (x < 0 || x > this.width || y < 0 || y > this.height) return;
       this.trySplit(x);
     };
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "r" || ev.key === "R") {
-        this.spawnPoints();
-        this.drawField();
-        this.drawPoints();
-        this.drawSplits();
-        this.drawGhost(null);
-        this.updateBanner();
-      }
-    };
+    this.ctx.app.stage.eventMode = "static";
+    this.ctx.app.stage.hitArea = this.ctx.app.screen;
+    this.ctx.app.stage.on("pointertap", onStageTap);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerleave", onLeave);
-    window.addEventListener("click", onClick);
     window.addEventListener("keydown", onKey);
 
     const onResize = () => {
